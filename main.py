@@ -2,8 +2,11 @@ import pandas as pd
 import OpenMuse 
 import matplotlib.pyplot as plt
 import scipy.signal as signal
+import numpy as np
+from scipy.signal import find_peaks
 
 files = ["data3.txt", "data4.txt", "data5.txt", "data6.txt"]
+# files = ["yan1.txt"]
 
 for file in files:
     with open(file, "r", encoding="utf-8") as f:
@@ -18,13 +21,57 @@ for file in files:
         columns=eeg_cols
     )
     eeg_raw = eeg_raw_resampled
+    eeg_raw = eeg_raw - np.mean(eeg_raw, axis=0)
     eeg_raw.to_csv(file.replace(".txt", "_eeg_128.csv"), index=False)
 
-    data["EEG"].plot(
-        x="time",  # Assuming 'time' is the x-axis column
-        y=data["EEG"].columns.drop("time"),  # Plot all columns except 'time'
-        subplots=True,
-    )
+    channel0 = eeg_raw[eeg_cols[0]]
+    peaks, _ = find_peaks(np.abs(channel0), height=100, distance=50)
+    peak_values = channel0.iloc[peaks]
 
-    plt.savefig(file.replace(".txt", "_eeg_plot.png"))
+    # Add peak markers to the raw plot
+    fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+    axs[0].plot(eeg_raw[eeg_cols[0]])
+    axs[0].set_title(f'EEG Raw - {eeg_cols[0]}')
+    axs[0].set_xlabel('Sample')
+    axs[0].set_xlim(0, len(eeg_raw))
+    axs[0].set_ylabel('Amplitude')
+    axs[0].plot(peaks, peak_values, "rx", label="Peaks")
+    for peak_idx, peak in zip(peaks, peak_values):
+        axs[0].annotate(
+            f"{peak_idx}\n{peak:.0f}",
+            xy=(peak_idx, peak),
+            xytext=(0, 10 if peak > 0 else -20),
+            textcoords="offset points",
+            ha="center",
+            color="red",
+            fontsize=8,
+        )
+    axs[0].legend()
+    axs[1].specgram(eeg_raw[eeg_cols[0]], NFFT=256, Fs=128, noverlap=128, cmap='viridis')
+    axs[1].set_title(f'Spectrogram - {eeg_cols[0]}')
+    axs[1].set_xlabel('Time (s)')
+    axs[1].set_ylabel('Frequency (Hz)')
+    plt.savefig(file.replace(".txt", "_eeg_raw_subplots_peaks.png"))
+    plt.close()
+
+    continue
+
+    fig, axs = plt.subplots(len(eeg_cols), 1, figsize=(10, 8))
+    for i, col in enumerate(eeg_cols):
+        axs[i].plot(eeg_raw[col])
+        axs[i].set_title(f'EEG Raw - {col}')
+        axs[i].set_xlabel('Sample')
+        axs[i].set_ylabel('Amplitude')
+    plt.tight_layout()
+    plt.savefig(file.replace(".txt", "_eeg_raw_subplots.png"))
+    plt.close()
+
+    fig, axs = plt.subplots(len(eeg_cols), 1, figsize=(10, 8))
+    for i, col in enumerate(eeg_cols):
+        axs[i].specgram(eeg_raw[col], NFFT=256, Fs=128, noverlap=128, cmap='viridis')
+        axs[i].set_title(f'Spectrogram - {col}')
+        axs[i].set_xlabel('Time (s)')
+        axs[i].set_ylabel('Frequency (Hz)')
+    plt.tight_layout()
+    plt.savefig(file.replace(".txt", "_eeg_specgram.png"))
     plt.close()
